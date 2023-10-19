@@ -43,9 +43,15 @@ __global__ void mySgemmV1Aligned(
         __shared__ float tile_b[CTAShape::kK][CTAShape::kN];
 
         float regC[ThreadShape::kM][CTAShape::kN] = {0.f};
-
+        // 每次load矩阵a的128*8个元素，一共256个线程，每个线程load矩阵a的四个元素，
+        // 所以thread0负责load这个128*8的小块中的第0行第0列这个元素开始的四个元素，thread1负责load第0行第4列这个元素开始的四个元素，然后换行，
+        // thread2负责load第1行第0列这个元素开始的四个元素
+        // 以此类推，所以load_a_smem_m（第几行）= tid / 2 = tid >> 1，
+        // load_a_smem_k（第几列）= (tid % 2 == 0) ? 0 : 4 = (tid & 1) << 2；
         const int load_a_smem_m = (tid / 2);
         const int load_a_smem_k = (tid % 2) << 2;
+        // 矩阵b的话就是一次load 8 * 128这么多元素，跟a类似只是32个线程才换一次行，
+        // load_b_smem_m（第几行）= tid / 32 = tid >> 5，load_b_smem_k（第几列）= (tid % 32) * 4 = (tid & 31) << 2。
         const int load_b_smem_k = (tid / 32);
         const int load_b_smem_n = (tid % 32) << 2;
 
